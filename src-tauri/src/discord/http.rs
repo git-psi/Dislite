@@ -1,6 +1,6 @@
 //! Client REST Discord : en-têtes du client web, limites de requêtes, erreurs typées.
 
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 use std::time::Duration;
 
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -8,12 +8,15 @@ use reqwest::multipart::{Form, Part};
 use reqwest::{Method, RequestBuilder, StatusCode};
 use serde_json::Value;
 
+use super::captcha::{self, Challenge};
 use super::identity::Identity;
 use super::ratelimit::{route_key, RateLimiter};
 use crate::error::{Error, Result};
 
 pub const API_BASE: &str = "https://discord.com/api/v9";
 const MAX_RETRIES: u32 = 3;
+/// Captchas proposés pour une même requête (un jeton refusé en redemande un).
+const MAX_CAPTCHAS: u32 = 2;
 
 pub struct UploadPart {
     pub filename: String,
@@ -30,6 +33,8 @@ pub struct DiscordHttp {
     identity: Arc<RwLock<Identity>>,
     token: RwLock<Option<String>>,
     limiter: RateLimiter,
+    /// Pour afficher un captcha quand Discord en demande un.
+    app: OnceLock<tauri::AppHandle>,
 }
 
 impl DiscordHttp {
@@ -46,7 +51,12 @@ impl DiscordHttp {
             identity,
             token: RwLock::new(None),
             limiter: RateLimiter::default(),
+            app: OnceLock::new(),
         })
+    }
+
+    pub fn set_app(&self, app: tauri::AppHandle) {
+        let _ = self.app.set(app);
     }
 
     pub fn client(&self) -> &reqwest::Client {
@@ -140,9 +150,14 @@ impl DiscordHttp {
         let route = route_key(&method, path);
         let url = format!("{API_BASE}{path}");
 
-        for attempt in 0..=MAX_RETRIES {
+        let mut captcha_headers = HeaderMap::new();
+        let mut captchas = 0;
+        let mut attempt = 0;
+        loop {
             self.limiter.acquire(&route).await;
-            let rb = self.client.request(method.clone(), &url).headers(self.headers(auth));
+            let mut headers = self.headers(auth);
+            headers.extend(captcha_headers.clone());
+            let rb = self.client.request(method.clone(), &url).headers(headers);
             let resp = build(rb).send().await?;
             self.limiter.update(&route, resp.headers()).await;
 
@@ -167,6 +182,7 @@ impl DiscordHttp {
                 } else {
                     tokio::time::sleep(retry).await;
                 }
+                attempt += 1;
                 continue;
             }
 
@@ -185,15 +201,39 @@ impl DiscordHttp {
                     serde_json::from_str(&text)?
                 });
             }
-            return Err(api_error(status, &text));
+            let body: Value = serde_json::from_str(&text).unwrap_or_default();
+            if let Some(challenge) = Challenge::from_body(&body) {
+                let app = self.app.get().filter(|_| captchas < MAX_CAPTCHAS);
+                let token = match app {
+                    Some(app) => captcha::solve(app, &challenge).await,
+                    None => None,
+                };
+                let Some(token) = token else { return Err(Error::CaptchaRequired) };
+                captchas += 1;
+                captcha_headers = challenge_headers(&challenge, &token);
+                continue;
+            }
+            return Err(api_error(status, &body));
         }
-        unreachable!("la boucle retourne toujours")
     }
 }
 
-fn api_error(status: StatusCode, text: &str) -> Error {
-    let body: Value = serde_json::from_str(text).unwrap_or_default();
-    if body.get("captcha_key").is_some() || body.get("captcha_sitekey").is_some() {
+/// En-têtes de la nouvelle tentative, avec le jeton du captcha résolu.
+fn challenge_headers(challenge: &Challenge, token: &str) -> HeaderMap {
+    let mut h = HeaderMap::new();
+    let mut put = |name: &'static str, value: Option<&str>| {
+        if let Some(v) = value.and_then(|v| HeaderValue::from_str(v).ok()) {
+            h.insert(HeaderName::from_static(name), v);
+        }
+    };
+    put("x-captcha-key", Some(token));
+    put("x-captcha-rqtoken", challenge.rqtoken.as_deref());
+    put("x-captcha-session-id", challenge.session_id.as_deref());
+    h
+}
+
+fn api_error(status: StatusCode, body: &Value) -> Error {
+    if body.get("captcha_key").is_some() {
         return Error::CaptchaRequired;
     }
     let mut message = body["message"]

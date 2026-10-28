@@ -28,7 +28,7 @@ Client Discord tiers **léger** (Rust / Tauri 2 + SolidJS). Dossier/paquet histo
 ## Tester sans risque
 - `npm run tauri dev` restaure la session (ne jamais appeler logout / effacer le dossier de config).
 - En dev : pont de débogage + `scripts/accord-eval 'js'`, `scripts/accord-shot <png absolu>`
-  (socket Unix : **Linux uniquement**).
+  (Linux et Windows ; la capture `accord-shot` : **Linux uniquement**).
 - Ne pas rejoindre de vocal / appeler / envoyer quoi que ce soit sur le compte sans l'accord de
   l'utilisateur : le vocal se teste **ensemble**.
 
@@ -37,17 +37,41 @@ Tout compile (tsc, vite, cargo). Restent à tester en vrai avec l'utilisateur : 
 latence), notifications à actions, sons, upload. Pistes : annulation d'écho, push-to-talk global,
 paquet AUR / AppImage, mises à jour.
 
-## Portage Windows (prochaine étape)
-À adapter (tout est aujourd'hui pensé pour Linux) :
-- `voice/audio.rs` : liste des micros via `pactl` + variables PipeWire → sous Windows, noms WASAPI
-  de `cpal` directement.
-- `desktop.rs` : autostart via `~/.config/autostart` → clé registre `HKCU\...\Run` ; tray : pas besoin
-  du test libappindicator.
-- `commands.rs` : `notify-rust` `wait_for_action` est propre à freedesktop → notifications Windows
-  (toast) avec actions, ou simple notification + clic.
-- `storage.rs` : permissions Unix (`0o600`, `OpenOptionsExt`) → `#[cfg(unix)]`.
-- `debug_bridge.rs` (socket Unix) et la capture `webkit2gtk` → `#[cfg(target_os = "linux")]`.
-- `commands.rs` : `media_support` (GStreamer) → `true` sous Windows (WebView2 lit la vidéo) ;
-  mode mini Hyprland (`hyprland_mini`) → Linux seulement.
-- `lib.rs` : variable `WEBKIT_DISABLE_DMABUF_RENDERER` → Linux seulement.
-Ensuite : `npm install`, `npm run tauri dev`, puis bundle NSIS/MSI.
+## Captcha
+`discord/captcha.rs` : sur une réponse avec `captcha_key`, `http.rs::send` ouvre une petite fenêtre
+sur `https://discord.com/robots.txt` (la clé hCaptcha de Discord n'est valable que sur ce domaine),
+remplace la page par le widget, récupère le jeton via une navigation sentinelle interceptée
+(`https://dislite.invalid/captcha?token=…`), puis rejoue la requête avec `X-Captcha-Key`,
+`X-Captcha-Rqtoken`, `X-Captcha-Session-Id`. Transparent pour le frontend. Test en dev :
+`scripts/accord-eval '@captcha'` (clé de test publique de hCaptcha, aucun appel à Discord).
+
+## Mises à jour
+`updater.rs` + `tauri-plugin-updater` (endpoint GitHub `git-psi/Dislite`, clé publique dans
+`tauri.conf.json`, privée dans `~/.tauri/dislite.key`, hors dépôt). Actives seulement en release, sous
+Windows et en AppImage (`APPIMAGE`) ; pas pour .deb/AUR. Vérif. 30 s après le lancement puis toutes
+les 24 h (réglage `autoUpdate` de `desktop.json`), installation sur demande (bandeau, réglages).
+Les artefacts signés ne sont produits qu'en CI (`.github/workflows/release.yml`, `--config` avec
+`createUpdaterArtifacts`) : une build locale n'a pas besoin de la clé. Version : `package.json` seul.
+Le dépôt est privé pour l'instant : les mises à jour ne fonctionneront qu'une fois public.
+
+## Pièges connus
+- En release, Tauri ajoute un nonce à la CSP, ce qui annule `'unsafe-inline'` : d'où
+  `dangerousDisableAssetCspModification: ["style-src"]` (sinon styles en ligne bloqués).
+- `tauri-plugin-single-instance` : relancer l'app ramène la fenêtre existante.
+
+## Linux et Windows : un seul code
+Tout le frontend et l'essentiel du Rust sont communs ; une modification d'interface vaut pour les
+deux. Les seules différences sont des `#[cfg(...)]` (rien de spécifique côté TypeScript, hormis
+`desktop_get().os` pour un texte d'aide) :
+- `voice/audio.rs` : Linux → liste `pactl` + pont PipeWire (`PIPEWIRE_NODE`…) ; ailleurs → noms cpal (WASAPI).
+- `desktop.rs` : autostart XDG (Linux) / clé `HKCU\…\Run` (Windows) ; test libappindicator Linux seulement.
+- `commands.rs` : notifications `notify-rust` (Linux) / toasts `tauri-winrt-notification` (Windows,
+  AUMID `dev.accord.client` en release, PowerShell en dev) ; `media_support` GStreamer (Linux) / `true` ;
+  mode mini Hyprland Linux seulement.
+- `discord/identity.rs` : UA et `os` = Chrome sous le vrai système ; langue `LANG` ou `GetUserDefaultLocaleName`.
+- `storage.rs` : permissions 0600/0700 sous Unix seulement.
+- `debug_bridge.rs` : socket Unix (Linux) / tube nommé `\\.\pipe\accord-debug` (Windows) ;
+  `scripts/accord-eval` gère les deux (`python scripts/accord-eval '…'` sous Windows).
+  La capture `@snapshot` reste Linux seulement.
+- `lib.rs` : `WEBKIT_DISABLE_DMABUF_RENDERER` Linux seulement.
+- `tauri.windows.conf.json` : bundle NSIS (installation par utilisateur).

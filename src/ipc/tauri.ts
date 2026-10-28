@@ -32,7 +32,8 @@ export const backend = {
   accountPrepareAdd: () => invoke<void>("account_prepare_add"),
   accountRemember: (profile: AccountProfile) => invoke<void>("account_remember", { profile }),
   accountRemove: (id: string) => invoke<void>("account_remove", { id }),
-  desktopGet: () => invoke<{ prefs: DesktopPrefs; trayAvailable: boolean; autostart: boolean }>("desktop_get"),
+  desktopGet: () =>
+    invoke<{ prefs: DesktopPrefs; trayAvailable: boolean; autostart: boolean; os: string; version: string; updates: boolean }>("desktop_get"),
   desktopSet: (prefs: DesktopPrefs) => invoke<void>("desktop_set", { prefs }),
   autostartSet: (on: boolean) => invoke<void>("autostart_set", { on }),
   voiceConnect: (params: VoiceConnectParams) => invoke<void>("voice_connect", { params }),
@@ -53,7 +54,16 @@ export const backend = {
     invoke<T>("api_upload", { path, payload, files, uploadId }),
   fileSizes: (paths: string[]) => invoke<number[]>("file_sizes", { paths }),
   notify: (title: string, body: string, channelId: string, call: boolean) => invoke<void>("notify", { title, body, channelId, call }),
+  updatePending: () => invoke<UpdateInfo | null>("update_pending"),
+  updateCheck: () => invoke<UpdateInfo | null>("update_check"),
+  /** télécharge, installe puis relance l'app */
+  updateInstall: () => invoke<void>("update_install"),
 };
+
+export interface UpdateInfo {
+  version: string;
+  notes: string | null;
+}
 
 /** Compte enregistré sur cet appareil (le token reste côté Rust). */
 export interface AccountProfile {
@@ -68,6 +78,7 @@ export interface DesktopPrefs {
   tray: boolean;
   closeToTray: boolean;
   startMinimized: boolean;
+  autoUpdate: boolean;
 }
 
 export interface VoiceConnectParams {
@@ -136,4 +147,7 @@ export const events = {
   onVoice: (cb: (e: VoiceEvent) => void) => listen<VoiceEvent>("voice:event", (e) => cb(e.payload)),
   onRemoteAuth: (cb: (e: RemoteAuthEvent) => void) =>
     listen<RemoteAuthEvent>("remote_auth", (e) => cb(e.payload)),
+  onUpdate: (cb: (info: UpdateInfo) => void) => listen<UpdateInfo>("update:available", (e) => cb(e.payload)),
+  onUpdateProgress: (cb: (received: number, total: number | null) => void) =>
+    listen<{ received: number; total: number | null }>("update:progress", (e) => cb(e.payload.received, e.payload.total)),
 };

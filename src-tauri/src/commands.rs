@@ -151,6 +151,7 @@ pub fn account_remove(state: State<'_, AppState>, id: String) -> Result<()> {
 
 /// WebKitGTK plante (abort) s'il tente de lire une vidéo sans les plugins GStreamer
 /// de base : le frontend affiche alors des vignettes au lieu des lecteurs.
+#[cfg(target_os = "linux")]
 #[tauri::command]
 pub fn media_support() -> bool {
     const DIRS: [&str; 3] = [
@@ -163,6 +164,13 @@ pub fn media_support() -> bool {
             .iter()
             .all(|lib| dir.join(lib).exists())
     })
+}
+
+/// WebView2 (Windows) et WebKit (macOS) lisent la vidéo sans rien de plus.
+#[cfg(not(target_os = "linux"))]
+#[tauri::command]
+pub fn media_support() -> bool {
+    true
 }
 
 /// Lit une vidéo dans mpv (repli quand WebKit ne peut pas la lire).
@@ -203,6 +211,7 @@ pub fn set_mini_mode(window: tauri::WebviewWindow, on: bool) -> Result<()> {
         .set_min_size(if on { None } else { Some(tauri::LogicalSize::new(NORMAL_MIN.0, NORMAL_MIN.1)) })
         .map_err(err)?;
 
+    #[cfg(target_os = "linux")]
     if std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() && hyprland_mini(on, MINI) {
         return Ok(());
     }
@@ -214,6 +223,7 @@ pub fn set_mini_mode(window: tauri::WebviewWindow, on: bool) -> Result<()> {
 }
 
 /// Hyprland récent (configuration Lua), puis l'ancienne syntaxe en repli.
+#[cfg(target_os = "linux")]
 fn hyprland_mini(on: bool, (w, h): (u32, u32)) -> bool {
     let dispatch = |cmd: &str| {
         std::process::Command::new("hyprctl")
@@ -346,13 +356,26 @@ fn notify_icon(app: &AppHandle) -> Option<String> {
     .clone()
 }
 
-/// Notification système avec boutons. Le bouton choisi revient en `notify:action`.
+/// Notification système avec boutons. Le bouton choisi revient en `notify:action`
+/// (`default` : clic sur la notification elle-même).
 #[tauri::command]
 pub fn notify(app: AppHandle, title: String, body: String, channel_id: String, call: bool) {
+    let icon = notify_icon(&app);
+    let on_action = move |action: &str| {
+        if action != "decline" {
+            crate::desktop::show_main(&app);
+        }
+        let _ = app.emit("notify:action", json!({ "action": action, "channelId": channel_id }));
+    };
+    show_notification(title, body, icon, call, on_action);
+}
+
+#[cfg(not(windows))]
+fn show_notification(title: String, body: String, icon: Option<String>, call: bool, on_action: impl Fn(&str) + Send + 'static) {
     std::thread::spawn(move || {
         let mut n = notify_rust::Notification::new();
         n.appname("Dislite").summary(&title).body(&body);
-        if let Some(icon) = notify_icon(&app) {
+        if let Some(icon) = icon {
             n.icon(&icon);
         }
         if call {
@@ -367,25 +390,68 @@ pub fn notify(app: AppHandle, title: String, body: String, channel_id: String, c
         }
         let Ok(handle) = n.show() else { return };
         handle.wait_for_action(|action| {
-            if action == "__closed" {
-                return;
+            if action != "__closed" {
+                on_action(action);
             }
-            if action != "decline" {
-                crate::desktop::show_main(&app);
-            }
-            let _ = app.emit("notify:action", json!({ "action": action, "channelId": channel_id }));
         });
     });
 }
 
+/// Le raccourci du menu Démarrer créé par l'installeur enregistre l'identifiant de l'app
+/// auprès de Windows ; sans lui (build de dev, exe lancé à la main), les toasts sous cet
+/// identifiant seraient ignorés en silence.
+#[cfg(windows)]
+fn installed_for_toasts() -> bool {
+    static INSTALLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *INSTALLED.get_or_init(|| {
+        !cfg!(debug_assertions)
+            && std::env::var_os("APPDATA").is_some_and(|d| {
+                std::path::Path::new(&d).join(r"Microsoft\Windows\Start Menu\Programs\Dislite.lnk").exists()
+            })
+    })
+}
+
+/// Toast Windows. Une application installée s'annonce sous son identifiant (raccourci du menu
+/// Démarrer créé par l'installeur) ; en développement, sous celui de PowerShell.
+#[cfg(windows)]
+fn show_notification(title: String, body: String, icon: Option<String>, call: bool, on_action: impl Fn(&str) + Send + 'static) {
+    use tauri_winrt_notification::{Duration, IconCrop, Scenario, Toast};
+    let app_id = if installed_for_toasts() { "dev.accord.client" } else { Toast::POWERSHELL_APP_ID };
+    let mut toast = Toast::new(app_id).title(&title).text1(&body);
+    if let Some(icon) = icon {
+        toast = toast.icon(std::path::Path::new(&icon), IconCrop::Square, "");
+    }
+    toast = if call {
+        toast
+            .scenario(Scenario::IncomingCall)
+            .add_button("Join", "accept")
+            .add_button("Decline", "decline")
+    } else {
+        toast.duration(Duration::Short)
+    };
+    let result = toast
+        .on_activated(move |action| {
+            // Clic sur la notification elle-même : pas d'argument.
+            on_action(action.as_deref().unwrap_or("default"));
+            Ok(())
+        })
+        .show();
+    if let Err(e) = result {
+        log::warn!("notification : {e}");
+    }
+}
+
 /// Réglages d'intégration au bureau, et ce que le système permet.
 #[tauri::command]
-pub fn desktop_get(state: State<'_, AppState>) -> Value {
+pub fn desktop_get(app: AppHandle, state: State<'_, AppState>) -> Value {
     let prefs = *state.desktop.read().unwrap();
     json!({
         "prefs": prefs,
         "trayAvailable": crate::desktop::tray_available(),
         "autostart": crate::desktop::autostart_enabled(),
+        "os": std::env::consts::OS,
+        "version": app.package_info().version.to_string(),
+        "updates": crate::updater::supported(),
     })
 }
 

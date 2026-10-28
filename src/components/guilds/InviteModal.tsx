@@ -32,8 +32,8 @@ export function InviteModal(props: { code: string }) {
       const open = () => (state.guilds[id] ? selectGuild(id) : setTimeout(open, 300));
       open();
     } catch (e) {
-      // Discord demande parfois un captcha : on ne le contourne pas, on renvoie au navigateur.
-      if (isBackendError(e) && e.kind === "captcha") setError({ text: "Discord wants a captcha check for this join.", browser: true });
+      // Captcha fermé sans être résolu (ou impossible à charger) : le navigateur reste une issue.
+      if (isBackendError(e) && e.kind === "captcha") setError({ text: "The captcha wasn't completed.", browser: true });
       else setError({ text: errorMessage(e) });
     } finally {
       setBusy(false);

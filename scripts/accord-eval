@@ -4,16 +4,27 @@ Le code est le corps d'une fonction async ; `return` renvoie une valeur JSON."""
 import json, os, socket, sys
 
 code = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else sys.stdin.read()
-path = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "accord-debug.sock")
-with socket.socket(socket.AF_UNIX) as s:
-    s.connect(path)
-    s.sendall(code.replace("\n", " ").encode() + b"\n")
-    buf = b""
-    while not buf.endswith(b"\n"):
-        chunk = s.recv(65536)
-        if not chunk:
-            break
-        buf += chunk
+line = code.replace("\n", " ").encode() + b"\n"
+buf = b""
+if os.name == "nt":
+    # Windows : tube nommé local.
+    with open(r"\\.\pipe\accord-debug", "r+b", buffering=0) as p:
+        p.write(line)
+        while not buf.endswith(b"\n"):
+            chunk = p.read(65536)
+            if not chunk:
+                break
+            buf += chunk
+else:
+    path = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "accord-debug.sock")
+    with socket.socket(socket.AF_UNIX) as s:
+        s.connect(path)
+        s.sendall(line)
+        while not buf.endswith(b"\n"):
+            chunk = s.recv(65536)
+            if not chunk:
+                break
+            buf += chunk
 res = json.loads(buf)
 if code.startswith("@snapshot"):
     res.setdefault("value", "ok")

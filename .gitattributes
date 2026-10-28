@@ -1,0 +1,6 @@
+# Même dépôt sous Linux et Windows : fins de ligne LF partout (les scripts shell
+# ne fonctionneraient plus sous Linux avec des CRLF).
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary

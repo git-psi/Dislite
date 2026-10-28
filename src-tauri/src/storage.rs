@@ -1,8 +1,10 @@
 //! Persistance locale minimale : fichiers JSON dans le dossier de config de l'app.
-//! Le token est écrit avec des permissions 0600.
+//! Le token est écrit avec des permissions 0600 (sous Windows, le dossier de l'utilisateur
+//! dans %APPDATA% n'est déjà accessible qu'à lui).
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+#[cfg(unix)]
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::PathBuf;
 
@@ -64,6 +66,7 @@ pub struct Storage {
 impl Storage {
     pub fn new(dir: PathBuf) -> std::io::Result<Self> {
         fs::create_dir_all(&dir)?;
+        #[cfg(unix)]
         fs::set_permissions(&dir, fs::Permissions::from_mode(0o700))?;
         Ok(Self { dir })
     }
@@ -182,12 +185,11 @@ impl Storage {
         let path = self.dir.join(name);
         let tmp = path.with_extension("tmp");
         {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .open(&tmp)?;
+            let mut options = OpenOptions::new();
+            options.write(true).create(true).truncate(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            let mut file = options.open(&tmp)?;
             file.write_all(&data)?;
             file.sync_all()?;
         }

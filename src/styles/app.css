@@ -1005,6 +1005,25 @@ kbd {
 }
 .toast.error { border-left: 4px solid var(--danger); }
 
+.update-banner {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 290;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 8px;
+  background: var(--bg-0);
+  color: var(--text);
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.update-banner .link-button { color: var(--accent-text); font-weight: 600; }
+.update-banner .icon-button { width: 26px; height: 26px; }
+.shell.mini ~ .update-banner { display: none; }
+
 
 /* ------------------------------------------------------------- modales & réglages */
 

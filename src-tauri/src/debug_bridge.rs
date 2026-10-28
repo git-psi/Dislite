@@ -1,23 +1,21 @@
 //! Pont de débogage (builds de développement uniquement).
 //!
-//! Une socket Unix privée (`$XDG_RUNTIME_DIR/accord-debug.sock`, mode 0600)
-//! reçoit une ligne de JavaScript, l'exécute dans la fenêtre et renvoie le
-//! résultat en JSON. Sert aux tests manuels et automatisés de l'interface.
+//! Une socket Unix privée (`$XDG_RUNTIME_DIR/accord-debug.sock`, mode 0600) ou, sous
+//! Windows, un tube nommé local (`\\.\pipe\accord-debug`) reçoit une ligne de JavaScript,
+//! l'exécute dans la fenêtre et renvoie le résultat en JSON. Sert aux tests manuels et
+//! automatisés de l'interface.
 //! Le serveur n'est démarré qu'en développement : en release, seul `debug_result`
 //! reste enregistré (et ne fait rien).
 #![cfg_attr(not(debug_assertions), allow(dead_code))]
 
 use std::collections::HashMap;
-use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::UnixListener;
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::oneshot;
 
 #[derive(Default)]
@@ -26,17 +24,20 @@ pub struct DebugBridge {
     pending: Mutex<HashMap<u64, oneshot::Sender<Value>>>,
 }
 
-fn socket_path() -> PathBuf {
-    let dir = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+#[cfg(unix)]
+fn socket_path() -> std::path::PathBuf {
+    let dir = std::env::var_os("XDG_RUNTIME_DIR").map(std::path::PathBuf::from).unwrap_or_else(std::env::temp_dir);
     dir.join("accord-debug.sock")
 }
 
+#[cfg(unix)]
 pub fn start(app: AppHandle) {
+    use std::os::unix::fs::PermissionsExt;
     app.manage(DebugBridge::default());
     tauri::async_runtime::spawn(async move {
         let path = socket_path();
         let _ = std::fs::remove_file(&path);
-        let listener = match UnixListener::bind(&path) {
+        let listener = match tokio::net::UnixListener::bind(&path) {
             Ok(l) => l,
             Err(e) => return log::warn!("pont de débogage indisponible : {e}"),
         };
@@ -44,25 +45,65 @@ pub fn start(app: AppHandle) {
         log::info!("pont de débogage : {}", path.display());
 
         while let Ok((stream, _)) = listener.accept().await {
-            let app = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let (read, mut write) = stream.into_split();
-                let mut lines = BufReader::new(read).lines();
-                while let Ok(Some(code)) = lines.next_line().await {
-                    // « @snapshot <fichier.png> » : capture du contenu de la page.
-                    let result = match code.strip_prefix("@snapshot ") {
-                        Some(path) => snapshot(&app, path.trim().to_owned()).await,
-                        None => eval(&app, &code).await,
-                    };
-                    let mut out = result.to_string();
-                    out.push('\n');
-                    if write.write_all(out.as_bytes()).await.is_err() {
-                        break;
-                    }
-                }
-            });
+            tauri::async_runtime::spawn(serve(app.clone(), stream));
         }
     });
+}
+
+#[cfg(windows)]
+pub fn start(app: AppHandle) {
+    use tokio::net::windows::named_pipe::ServerOptions;
+    const PIPE: &str = r"\\.\pipe\accord-debug";
+    app.manage(DebugBridge::default());
+    tauri::async_runtime::spawn(async move {
+        // Une instance du tube par client : on en recrée une dès qu'un client se connecte.
+        let mut server = match ServerOptions::new().first_pipe_instance(true).create(PIPE) {
+            Ok(s) => s,
+            Err(e) => return log::warn!("pont de débogage indisponible : {e}"),
+        };
+        log::info!("pont de débogage : {PIPE}");
+        while server.connect().await.is_ok() {
+            let client = server;
+            server = match ServerOptions::new().create(PIPE) {
+                Ok(s) => s,
+                Err(e) => return log::warn!("pont de débogage arrêté : {e}"),
+            };
+            tauri::async_runtime::spawn(serve(app.clone(), client));
+        }
+    });
+}
+
+/// Une connexion : une ligne de code reçue, une ligne de JSON renvoyée.
+async fn serve(app: AppHandle, stream: impl AsyncRead + AsyncWrite + Send + 'static) {
+    let (read, mut write) = tokio::io::split(stream);
+    let mut lines = BufReader::new(read).lines();
+    while let Ok(Some(code)) = lines.next_line().await {
+        // « @snapshot <fichier.png> » : capture du contenu de la page.
+        let result = match code.strip_prefix("@snapshot ") {
+            Some(path) => snapshot(&app, path.trim().to_owned()).await,
+            // « @captcha » : fenêtre de captcha avec la clé de test publique de hCaptcha.
+            None if code.trim() == "@captcha" => captcha_test(&app).await,
+            None => eval(&app, &code).await,
+        };
+        let mut out = result.to_string();
+        out.push('\n');
+        if write.write_all(out.as_bytes()).await.is_err() {
+            break;
+        }
+    }
+}
+
+async fn captcha_test(app: &AppHandle) -> Value {
+    let challenge = crate::discord::captcha::Challenge {
+        sitekey: "10000000-ffff-ffff-ffff-000000000001".into(),
+        rqdata: None,
+        rqtoken: None,
+        session_id: None,
+    };
+    match crate::discord::captcha::solve(app, &challenge).await {
+        Some(token) => json!({ "ok": true, "value": token }),
+        None => json!({ "ok": false, "error": "no token" }),
+    }
 }
 
 async fn eval(app: &AppHandle, code: &str) -> Value {

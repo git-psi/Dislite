@@ -15,6 +15,10 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+# Un seul Dislite à la fois : relancer l'app ramène la fenêtre existante.
+tauri-plugin-single-instance = "2"
+# Mises à jour signées depuis les Releases GitHub.
+tauri-plugin-updater = "2"
 
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
@@ -22,8 +26,6 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 tokio-tungstenite = { version = "0.27", features = ["rustls-tls-webpki-roots"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart", "cookies", "gzip", "brotli", "stream"] }
-# Notifications système avec boutons (freedesktop)
-notify-rust = "4"
 bytes = "1"
 flate2 = "1"
 rsa = { version = "0.9", features = ["sha2"] }
@@ -45,12 +47,25 @@ davey = "=0.2.0-beta.1"
 # Suppression de bruit (RNNoise, en Rust pur)
 nnnoiseless = { version = "0.5", default-features = false }
 env_logger = "0.11"
+# Fuseau horaire IANA (Linux : /etc/localtime ; Windows : API du système).
+iana-time-zone = "0.1"
 
-# Capture de la page par le pont de débogage (mêmes versions que celles de Tauri).
+[target.'cfg(not(windows))'.dependencies]
+# Notifications système avec boutons (freedesktop)
+notify-rust = "4"
+
 [target.'cfg(target_os = "linux")'.dependencies]
+# Capture de la page par le pont de débogage (mêmes versions que celles de Tauri).
 webkit2gtk = "2.0"
 cairo-rs = { version = "0.18", features = ["png"] }
 gio = "0.18"
+
+[target.'cfg(windows)'.dependencies]
+# Notifications Windows (toasts) avec boutons, lancement à l'ouverture de session (clé Run),
+# langue de l'utilisateur.
+tauri-winrt-notification = "0.8"
+winreg = "0.56"
+windows-sys = { version = "0.61", features = ["Win32_Globalization"] }
 
 # Dépendances optimisées même en dev (tauri, WebKit, TLS, serde…) : démarrage et
 # connexion bien plus rapides ; seul le code de Dislite reste en debug (compilation rapide).

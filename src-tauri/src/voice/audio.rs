@@ -104,7 +104,8 @@ impl Linear {
     }
 }
 
-/// Périphérique proposé à l'utilisateur : identifiant PipeWire/Pulse et nom lisible.
+/// Périphérique proposé à l'utilisateur : identifiant (nœud PipeWire/Pulse, ou nom cpal)
+/// et nom lisible.
 #[derive(serde::Serialize, Clone)]
 pub struct DeviceInfo {
     pub id: String,
@@ -117,6 +118,7 @@ pub struct Devices {
 }
 
 /// Vrais micros et sorties, via PipeWire (pactl) ; sans lui, liste ALSA brute.
+#[cfg(target_os = "linux")]
 pub fn devices() -> Devices {
     let list = |kind: &str| -> Option<Vec<DeviceInfo>> {
         let out = std::process::Command::new("pactl").args(["-f", "json", "list", kind]).output().ok()?;
@@ -139,6 +141,16 @@ pub fn devices() -> Devices {
     if let (Some(inputs), Some(outputs)) = (list("sources"), list("sinks")) {
         return Devices { inputs, outputs };
     }
+    cpal_devices()
+}
+
+/// Ailleurs (WASAPI sous Windows), les noms cpal sont déjà les noms lisibles.
+#[cfg(not(target_os = "linux"))]
+pub fn devices() -> Devices {
+    cpal_devices()
+}
+
+fn cpal_devices() -> Devices {
     let host = cpal::default_host();
     let names = |devs: Option<Vec<cpal::Device>>| -> Vec<DeviceInfo> {
         devs.unwrap_or_default()
@@ -156,6 +168,7 @@ pub fn devices() -> Devices {
 /// Périphérique à ouvrir. On passe de préférence par le pont ALSA natif de PipeWire, qui
 /// respecte une latence demandée (PIPEWIRE_LATENCY) et vise le nœud choisi (PIPEWIRE_NODE) ;
 /// le pont « pulse » ajoute de gros tampons. Un nom ALSA explicite est ouvert tel quel.
+#[cfg(target_os = "linux")]
 fn pick(devices: Vec<cpal::Device>, choice: Option<&str>, fallback: Option<cpal::Device>) -> Option<cpal::Device> {
     let named = |n: &str| devices.iter().find(|d| d.name().map(|x| x == n).unwrap_or(false)).cloned();
     if let Some(choice) = choice {
@@ -176,6 +189,14 @@ fn pick(devices: Vec<cpal::Device>, choice: Option<&str>, fallback: Option<cpal:
         }
         named("pulse")
     }).or(fallback)
+}
+
+/// Le périphérique choisi par son nom cpal, sinon celui par défaut du système.
+#[cfg(not(target_os = "linux"))]
+fn pick(devices: Vec<cpal::Device>, choice: Option<&str>, fallback: Option<cpal::Device>) -> Option<cpal::Device> {
+    choice
+        .and_then(|n| devices.into_iter().find(|d| d.name().map(|x| x == n).unwrap_or(false)))
+        .or(fallback)
 }
 
 /// Flux audio en cours ; les arrêter = relâcher cette valeur.
@@ -225,6 +246,7 @@ pub fn start(setup: AudioSetup) -> Result<AudioIo, String> {
 fn open_streams(setup: AudioSetup) -> Result<(Option<cpal::Stream>, cpal::Stream), String> {
     let host = cpal::default_host();
     // ~10 ms par période : la voix part et arrive sans attendre de gros tampons.
+    #[cfg(target_os = "linux")]
     std::env::set_var("PIPEWIRE_LATENCY", "480/48000");
     let outputs = host.output_devices().map(|d| d.collect()).unwrap_or_default();
     let output = pick(outputs, setup.output.as_deref(), host.default_output_device()).ok_or("no audio output found")?;

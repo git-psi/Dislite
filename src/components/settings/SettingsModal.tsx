@@ -2,6 +2,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { createResource, createSignal, For, type JSX, Match, onCleanup, Show, Switch } from "solid-js";
 import { micLevel, setMicLevel } from "../../actions/voice";
 import { accounts, addAccount, logoutAccount, removeAccount, switchAccount } from "../../actions/accounts";
+import { checkForUpdate, installUpdate } from "../../actions/updates";
 import { type AudioDevice, backend, type DesktopPrefs, errorMessage } from "../../ipc/tauri";
 import { avatarUrl } from "../../lib/cdn";
 import { loadProfile, profileOf } from "../../actions/profiles";
@@ -383,6 +384,17 @@ function AppSection() {
     }
   };
   const trayOff = () => !desktop()?.trayAvailable;
+  const [checking, setChecking] = createSignal(false);
+  const checkNow = async () => {
+    setChecking(true);
+    try {
+      if (!(await checkForUpdate())) toast("Dislite is up to date.");
+    } catch (e) {
+      toast(errorMessage(e), true);
+    } finally {
+      setChecking(false);
+    }
+  };
 
   return (
     <>
@@ -390,7 +402,11 @@ function AppSection() {
       <Show when={desktop()}>
         <Row
           title="Launch when you log in"
-          hint="Adds Dislite to your session's autostart. On Hyprland, this needs XDG autostart support (uwsm or dex)."
+          hint={
+            desktop()!.os === "linux"
+              ? "Adds Dislite to your session's autostart. On Hyprland, this needs XDG autostart support (uwsm or dex)."
+              : "Starts Dislite when you sign in."
+          }
         >
           <Toggle value={desktop()!.autostart} onChange={setAutostart} />
         </Row>
@@ -413,8 +429,28 @@ function AppSection() {
         <Row title="Start minimized" hint="When launched at login, stay in the tray until you open it." disabled={!prefs()!.tray || trayOff()}>
           <Toggle value={prefs()!.startMinimized} disabled={!prefs()!.tray || trayOff()} onChange={(v) => update({ startMinimized: v })} />
         </Row>
+        <Show when={desktop()!.updates}>
+          <Row title="Check for updates" hint="Looks for a new version at launch, then once a day. You choose when to install it.">
+            <Toggle value={prefs()!.autoUpdate} onChange={(v) => update({ autoUpdate: v })} />
+          </Row>
+          <Row
+            title={ui.update ? `Version ${ui.update.version} is available` : "Updates"}
+            hint={ui.update?.notes ?? undefined}
+          >
+            <Show
+              when={ui.update}
+              fallback={<button class="btn small" disabled={checking()} onClick={() => void checkNow()}>{checking() ? "Checking…" : "Check now"}</button>}
+            >
+              <button class="btn small" disabled={!!ui.updating} onClick={() => void installUpdate()}>
+                {ui.updating ? "Updating…" : "Update and restart"}
+              </button>
+            </Show>
+          </Row>
+        </Show>
       </Show>
-      <p class="setting-hint about">Dislite 0.1 — a lightweight Discord client. Settings are stored on this computer.</p>
+      <p class="setting-hint about">
+        Dislite {desktop()?.version ?? ""} — a lightweight Discord client. Settings are stored on this computer.
+      </p>
     </>
   );
 }

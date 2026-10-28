@@ -15,7 +15,7 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("session invalid or expired")]
     Unauthorized,
-    #[error("Discord requires a captcha for this action; do it from the official app")]
+    #[error("Captcha not completed")]
     CaptchaRequired,
     #[error("{message}")]
     Api {

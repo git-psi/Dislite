@@ -70,6 +70,10 @@ export interface UiState {
   /** fiche de profil ouverte */
   profile: ProfileTarget | null;
   toast: { text: string; error?: boolean } | null;
+  /** mise à jour trouvée (bandeau discret tant qu'elle n'est pas écartée) */
+  update: { version: string; notes: string | null; dismissed?: boolean } | null;
+  /** installation en cours : progression de 0 à 1 (null si la taille est inconnue) */
+  updating: { progress: number | null } | null;
 }
 
 export const [ui, setUi] = createStore<UiState>({
@@ -100,6 +104,8 @@ export const [ui, setUi] = createStore<UiState>({
 
   profile: null,
   toast: null,
+  update: null,
+  updating: null,
 });
 
 window.addEventListener("resize", () => setUi("narrow", window.innerWidth < 1100));

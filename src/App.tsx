@@ -22,6 +22,7 @@ import { VolumePopover } from "./components/voice/VolumePopover";
 import { InviteModal } from "./components/guilds/InviteModal";
 import { PromptHost } from "./components/common/Prompt";
 import { invite, inviteCode, setInvite } from "./actions/invites";
+import { installUpdate, watchUpdates } from "./actions/updates";
 import { voice } from "./store/voice";
 import { Login } from "./components/login/Login";
 import { ProfilePopout } from "./components/profile/ProfilePopout";
@@ -130,6 +131,30 @@ function Toast() {
   return (
     <Show when={ui.toast}>
       {(t) => <div class="toast" classList={{ error: !!t().error }}>{t().text}</div>}
+    </Show>
+  );
+}
+
+/** Mise à jour prête : discrète, en bas à droite, jusqu'à ce qu'on l'installe ou l'écarte. */
+function UpdateBanner() {
+  return (
+    <Show when={ui.update && !ui.update.dismissed}>
+      <div class="update-banner">
+        <Show
+          when={ui.updating}
+          fallback={
+            <>
+              <span>Dislite {ui.update!.version} is available.</span>
+              <button class="link-button" onClick={() => void installUpdate()}>Update and restart</button>
+              <button class="icon-button" title="Later" onClick={() => setUi("update", "dismissed", true)}>
+                <Icon name="x" size={14} />
+              </button>
+            </>
+          }
+        >
+          {(u) => <span>Updating… {u().progress !== null ? `${Math.round(u().progress! * 100)} %` : ""}</span>}
+        </Show>
+      </div>
     </Show>
   );
 }
@@ -401,6 +426,7 @@ export function App() {
       setTimeout(() => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus(), 150);
     });
     backend.mediaSupport().then((ok) => setUi("mediaSupported", ok)).catch(() => {});
+    watchUpdates();
     const toLogin = () => {
       // Plus de session : l'instantané éventuel n'a plus lieu d'être affiché.
       resetState();
@@ -429,6 +455,7 @@ export function App() {
         </Match>
       </Switch>
       <Toast />
+      <UpdateBanner />
     </>
   );
 }

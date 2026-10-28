@@ -1,0 +1,5 @@
+# Windows : libopus est compilée depuis ses sources (audiopus_sys) avec CMake ; son
+# CMakeLists date d'avant CMake 3.5, refusé par CMake 4 sans cette variable.
+# Sous Linux, la libopus du système est utilisée et cette variable ne sert pas.
+[env]
+CMAKE_POLICY_VERSION_MINIMUM = "3.5"

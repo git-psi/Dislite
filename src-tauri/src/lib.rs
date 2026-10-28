@@ -5,6 +5,7 @@ mod discord;
 mod error;
 mod state;
 mod storage;
+mod updater;
 mod voice;
 
 use tauri::Manager;
@@ -17,6 +18,7 @@ pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("dislite_lib=info")).init();
 
     // WebKitGTK + pilote NVIDIA propriétaire : le rendu DMA-BUF donne souvent une fenêtre blanche.
+    #[cfg(target_os = "linux")]
     if std::path::Path::new("/proc/driver/nvidia").exists()
         && std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none()
     {
@@ -24,13 +26,18 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        // En premier : une deuxième instance s'arrête aussitôt et ramène la première.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| desktop::show_main(app)))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(move |app| {
             let storage = Storage::new(app.path().app_config_dir()?)?;
             app.manage(AppState::new(storage)?);
+            app.state::<AppState>().http.set_app(app.handle().clone());
             #[cfg(debug_assertions)]
             debug_bridge::start(app.handle().clone());
+            updater::start(app.handle().clone());
             let prefs = *app.state::<AppState>().desktop.read().unwrap();
             if prefs.tray {
                 if let Err(e) = desktop::set_tray(app.handle(), true) {
@@ -81,6 +88,9 @@ pub fn run() {
             commands::autostart_set,
             commands::file_sizes,
             commands::notify,
+            updater::update_pending,
+            updater::update_check,
+            updater::update_install,
             voice::voice_connect,
             voice::voice_disconnect,
             voice::voice_set_mute,

@@ -1,6 +1,6 @@
 //! Identité du client présentée à Discord.
 //!
-//! Dislite se présente comme le client web officiel (Chrome sous Linux) : mêmes
+//! Dislite se présente comme le client web officiel (Chrome sous Linux ou Windows) : mêmes
 //! « super properties », même user-agent, même numéro de build. C'est ce qui
 //! permet de ne pas se distinguer d'un navigateur classique.
 
@@ -20,6 +20,12 @@ const CHROME_VERSION: &str = "140.0.0.0";
 const BUILD_CACHE_FILE: &str = "build.json";
 const BUILD_CACHE_TTL: Duration = Duration::from_secs(24 * 3600);
 
+/// Système annoncé : celui sur lequel on tourne, comme un navigateur.
+#[cfg(windows)]
+const OS: (&str, &str, &str) = ("Windows NT 10.0; Win64; x64", "Windows", "10");
+#[cfg(not(windows))]
+const OS: (&str, &str, &str) = ("X11; Linux x86_64", "Linux", "");
+
 #[derive(Clone, Debug)]
 pub struct Identity {
     pub user_agent: String,
@@ -33,7 +39,8 @@ impl Identity {
     pub fn detect() -> Self {
         Self {
             user_agent: format!(
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{CHROME_VERSION} Safari/537.36"
+                "Mozilla/5.0 ({}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{CHROME_VERSION} Safari/537.36",
+                OS.0
             ),
             locale: detect_locale(),
             timezone: detect_timezone(),
@@ -44,14 +51,14 @@ impl Identity {
 
     pub fn super_properties(&self) -> Value {
         json!({
-            "os": "Linux",
+            "os": OS.1,
             "browser": "Chrome",
             "device": "",
             "system_locale": self.locale,
             "has_client_mods": false,
             "browser_user_agent": self.user_agent,
             "browser_version": CHROME_VERSION,
-            "os_version": "",
+            "os_version": OS.2,
             "referrer": "",
             "referring_domain": "",
             "referrer_current": "",
@@ -166,14 +173,33 @@ async fn fetch_build_number(client: &reqwest::Client, ua: &str) -> Option<u64> {
     None
 }
 
-/// Convertit `LANG` (ex. `fr_FR.UTF-8`) en locale Discord (ex. `fr`, `en-US`).
-fn detect_locale() -> String {
-    let raw = std::env::var("LC_ALL")
+/// Langue du système : `LANG` (ex. `fr_FR.UTF-8`), sinon celle de la session Windows
+/// (ex. `fr-FR`).
+fn system_locale() -> String {
+    let env = std::env::var("LC_ALL")
         .or_else(|_| std::env::var("LC_MESSAGES"))
         .or_else(|_| std::env::var("LANG"))
-        .unwrap_or_default();
+        .ok();
+    #[cfg(windows)]
+    let env = env.or_else(windows_locale);
+    env.unwrap_or_default()
+}
+
+#[cfg(windows)]
+fn windows_locale() -> Option<String> {
+    use windows_sys::Win32::Globalization::GetUserDefaultLocaleName;
+    // LOCALE_NAME_MAX_LENGTH
+    let mut buf = [0u16; 85];
+    // SAFETY : le tampon a la taille annoncée ; la longueur renvoyée inclut le zéro final.
+    let len = unsafe { GetUserDefaultLocaleName(buf.as_mut_ptr(), buf.len() as i32) };
+    (len > 1).then(|| String::from_utf16_lossy(&buf[..len as usize - 1]))
+}
+
+/// Convertit la langue du système (ex. `fr_FR.UTF-8`, `fr-FR`) en locale Discord (ex. `fr`, `en-US`).
+fn detect_locale() -> String {
+    let raw = system_locale();
     let base = raw.split(['.', '@']).next().unwrap_or("");
-    let mut parts = base.split('_');
+    let mut parts = base.split(['_', '-']);
     let lang = parts.next().unwrap_or("").to_lowercase();
     let region = parts.next().unwrap_or("").to_uppercase();
 
@@ -199,14 +225,7 @@ fn detect_timezone() -> String {
             return tz.into();
         }
     }
-    if let Ok(target) = std::fs::read_link("/etc/localtime") {
-        let s = target.to_string_lossy();
-        if let Some(idx) = s.find("zoneinfo/") {
-            return s[idx + "zoneinfo/".len()..].to_string();
-        }
-    }
-    std::fs::read_to_string("/etc/timezone")
-        .map(|s| s.trim().to_string())
+    iana_time_zone::get_timezone()
         .ok()
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "UTC".into())
