@@ -329,7 +329,7 @@ img { display: block; }
   align-items: center;
   flex-shrink: 0;
 }
-.unread-jump:hover { background: var(--accent); color: var(--on-accent); }
+.unread-jump:not(.empty):hover { background: var(--accent); color: var(--on-accent); }
 .unread-jump.empty { opacity: 0.45; cursor: default; background: transparent; }
 .unread-count { font-size: 14px; font-weight: 700; line-height: 1.1; }
 .unread-label { font-size: 9px; color: inherit; opacity: 0.75; }
