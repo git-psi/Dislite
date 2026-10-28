@@ -62,7 +62,6 @@ Windows et en AppImage (`APPIMAGE`) ; pas pour .deb/AUR. Vérif. 30 s après le 
 les 24 h (réglage `autoUpdate` de `desktop.json`), installation sur demande (bandeau, réglages).
 Les artefacts signés ne sont produits qu'en CI (`.github/workflows/release.yml`, `--config` avec
 `createUpdaterArtifacts`) : une build locale n'a pas besoin de la clé. Version : `package.json` seul.
-Le dépôt est privé pour l'instant : les mises à jour ne fonctionneront qu'une fois public.
 
 ## Pièges connus
 - En release, Tauri ajoute un nonce à la CSP, ce qui annule `'unsafe-inline'` : d'où
