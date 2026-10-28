@@ -1,0 +1,48 @@
+# Maintainer: git-psi
+
+pkgname=dislite-bin
+_pkgname=dislite
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="A light, calm Discord client (unofficial)"
+arch=('x86_64')
+url="https://github.com/git-psi/Dislite"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libsoup3' 'glib2' 'gdk-pixbuf2' 'cairo' 'dbus'
+         'opus' 'alsa-lib' 'gcc-libs' 'glibc' 'hicolor-icon-theme')
+optdepends=('libayatana-appindicator: tray icon'
+            'gst-plugins-base: play videos in the app'
+            'gst-plugins-good: play videos in the app'
+            'mpv: play videos when GStreamer is missing'
+            'libpulse: readable microphone and speaker names (pactl)')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+source=("$_pkgname-$pkgver.deb::$url/releases/download/v$pkgver/Dislite_${pkgver}_amd64.deb"
+        "LICENSE-$pkgver::https://raw.githubusercontent.com/git-psi/Dislite/v$pkgver/LICENSE")
+noextract=("$_pkgname-$pkgver.deb")
+sha256sums=('ab18ba21bd82f33234d52f3757ff6ae7498f34cea7fd1e7fe1e75ded3ded911c'
+            'eaebf43ce9ba1e8ef81e9d07947fae870dce8a7af691a8d38fdee1cd30bb41a2')
+
+prepare() {
+  mkdir -p deb
+  bsdtar -xf "$_pkgname-$pkgver.deb" -C deb
+  bsdtar -xf deb/data.tar.gz -C deb
+}
+
+package() {
+  install -Dm755 deb/usr/bin/dislite "$pkgdir/usr/bin/dislite"
+
+  install -Dm644 deb/usr/share/applications/Dislite.desktop "$pkgdir/usr/share/applications/dislite.desktop"
+  # Description du menu en anglais, comme l'interface.
+  sed -i 's/^Comment=.*/Comment=A light, calm Discord client/' "$pkgdir/usr/share/applications/dislite.desktop"
+
+  for size in 32x32 128x128 512x512; do
+    install -Dm644 "deb/usr/share/icons/hicolor/$size/apps/dislite.png" \
+      "$pkgdir/usr/share/icons/hicolor/$size/apps/dislite.png"
+  done
+  # Le .deb range l'icône 256 px dans « 256x256@2 », dossier que les thèmes d'icônes ignorent.
+  install -Dm644 "deb/usr/share/icons/hicolor/256x256@2/apps/dislite.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/dislite.png"
+
+  install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
