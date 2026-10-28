@@ -64,6 +64,8 @@ export interface SessionState {
   voiceChannels: Record<Snowflake, Snowflake[]>;
   /** MP / groupe -> appel en cours */
   calls: Record<Snowflake, Call>;
+  /** Discord refuse les salons 18+ à ce compte (âge non vérifié) : ils sont illisibles */
+  nsfwBlocked: boolean;
 }
 
 export const initialState = (): SessionState => ({
@@ -94,6 +96,7 @@ export const initialState = (): SessionState => ({
   voiceStates: {},
   voiceChannels: {},
   calls: {},
+  nsfwBlocked: false,
 });
 
 export const [state, setState] = createStore<SessionState>(initialState());

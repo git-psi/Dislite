@@ -150,16 +150,24 @@ export function isChannelMuted(channelId: Snowflake): boolean {
 
 // ---------------------------------------------------------------- non-lus
 
+/** Salon (ou fil d'un salon) 18+ que Discord refuse à ce compte : ni lisible, ni marquable comme lu. */
+export function isAgeBlocked(channelId: Snowflake): boolean {
+  if (!state.nsfwBlocked) return false;
+  const ch = state.channels[channelId];
+  return !!ch && (!!ch.nsfw || !!(ch.parent_id && state.channels[ch.parent_id]?.nsfw));
+}
+
 export function isUnread(channelId: Snowflake): boolean {
   const ch = state.channels[channelId];
-  if (!ch?.last_message_id) return false;
+  if (!ch?.last_message_id || isAgeBlocked(channelId)) return false;
   const rs = state.readStates[channelId];
   // Pas d'état de lecture : on considère le salon comme lu (comme l'officiel pour les anciens salons).
   if (!rs) return false;
   return isNewer(ch.last_message_id, rs.last_message_id);
 }
 
-export const mentionCount = (channelId: Snowflake) => state.readStates[channelId]?.mention_count ?? 0;
+export const mentionCount = (channelId: Snowflake) =>
+  isAgeBlocked(channelId) ? 0 : state.readStates[channelId]?.mention_count ?? 0;
 
 export const guildUnread = keyedMemo((guildId: Snowflake) => {
   let unread = false;

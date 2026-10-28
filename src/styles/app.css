@@ -675,7 +675,8 @@ kbd {
 }
 .message.grouped { margin-top: 0; }
 .message:hover { background: var(--bg-message-hover); }
-.message.mentioned { background: var(--mention-bg); box-shadow: inset 3px 0 0 var(--mention-border); }
+/* Barre droite dessinée dans le fond : l'arrondi la coupe, sans la courber (contrairement à une ombre). */
+.message.mentioned { background: linear-gradient(to right, var(--mention-border) 3px, var(--mention-bg) 3px); }
 .message.pending .message-content, .message.pending .attachments { opacity: 0.5; }
 .message.failed .message-content { color: var(--danger); }
 .message.editing { background: var(--bg-message-hover); }
@@ -805,7 +806,8 @@ kbd {
 .audio-card audio { width: 400px; max-width: 100%; }
 .sticker { width: 160px; height: 160px; object-fit: contain; }
 
-.embed { display: flex; gap: 16px; max-width: 520px; padding: 8px 16px 16px 12px; border-left: 4px solid; border-radius: 4px; background: var(--bg-2); }
+/* Barre de couleur droite, coupée par l'arrondi (un border-left suivrait la courbe). */
+.embed { display: flex; gap: 16px; max-width: 520px; padding: 8px 16px 16px 16px; border-radius: 4px; background: linear-gradient(to right, var(--bar, var(--bg-4)) 4px, var(--bg-2) 4px); }
 .embed-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-top: 6px; }
 .embed-author { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .embed-author img { width: 24px; height: 24px; border-radius: 50%; }
@@ -929,7 +931,6 @@ kbd {
 .post-list { display: flex; flex-direction: column; gap: 8px; }
 .post-card { display: flex; gap: 16px; padding: 16px; border-radius: 8px; background: var(--bg-2); border: 1px solid transparent; }
 .post-card:hover { background: var(--bg-hover-solid); border-color: var(--bg-4); }
-.post-card.unread .post-title::after { content: ""; display: inline-block; width: 8px; height: 8px; margin-left: 8px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 .post-card.unread { border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
 .post-card.unread .post-title { color: var(--text-strong); }
 .post-badge { display: inline-block; margin-right: 8px; padding: 1px 6px; border-radius: 4px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; vertical-align: 2px; }
@@ -1007,7 +1008,7 @@ kbd {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   max-width: 80vw;
 }
-.toast.error { border-left: 4px solid var(--danger); }
+.toast.error { padding-left: 20px; background: linear-gradient(to right, var(--danger) 4px, var(--bg-0) 4px); }
 
 .update-banner {
   position: fixed;
@@ -1690,7 +1691,7 @@ div.app-select { display: flex; align-items: center; }
 .app-gallery img { width: 100%; height: 140px; object-fit: cover; cursor: zoom-in; }
 .app-separator { border: 0; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
 .app-separator.invisible { border-color: transparent; }
-.app-container { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 8px; background: var(--bg-2); border-left: 4px solid; }
+.app-container { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 12px 18px; border-radius: 8px; background: linear-gradient(to right, var(--bar, var(--bg-4)) 4px, var(--bg-2) 4px); }
 .profile-edit { display: flex; gap: 20px; align-items: center; margin-bottom: 14px; }
 .avatar-edit { position: relative; width: 84px; height: 84px; border-radius: 50%; overflow: hidden; cursor: pointer; flex-shrink: 0; }
 .avatar-edit img { width: 100%; height: 100%; object-fit: cover; }
@@ -1714,3 +1715,7 @@ div.app-select { display: flex; align-items: center; }
 .upload-progress { position: relative; max-width: 320px; height: 22px; margin-top: 4px; border-radius: 6px; background: var(--bg-2); overflow: hidden; }
 .upload-progress span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent-soft-strong); transition: width 0.1s linear; }
 .upload-progress em { position: relative; display: block; padding: 0 8px; font-size: 12px; font-style: normal; line-height: 22px; color: var(--muted); }
+
+/* Salon 18+ refusé par Discord à ce compte */
+.age-gate { flex: 1; flex-direction: column; gap: 10px; text-align: center; padding: 24px; }
+.age-gate p { margin: 0; max-width: 360px; }

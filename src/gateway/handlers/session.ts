@@ -1,5 +1,6 @@
 // READY et réglages de l'utilisateur.
 
+import { initNsfwBlocked } from "../../actions/messages";
 import { reconcile } from "solid-js/store";
 import { decodeUserSettings } from "../../lib/userSettings";
 import { clearVoiceStates, loadGuild, normalizeChannel, putMembers, putPresence, putUsers } from "../../store/mutations";
@@ -73,6 +74,7 @@ on("READY", (d) => {
 
   putUsers([d.user, ...(d.users ?? [])]);
   setState("meId", d.user.id);
+  initNsfwBlocked(d.user);
 
   // Serveurs (+ notre propre membre, dédupliqué dans merged_members).
   (d.guilds ?? []).forEach((g: any, i: number) => {

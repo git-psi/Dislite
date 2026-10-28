@@ -1,9 +1,9 @@
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from "solid-js";
-import { ackChannel, loadMessages } from "../../actions/messages";
+import { ackChannel, loadMessages, setNsfwBlocked } from "../../actions/messages";
 import { openChannel, selectGuild } from "../../actions/navigation";
 import { subscribeGuild } from "../../gateway/client";
-import { channelLabel, displayName, dmRecipient, isUnread, privateChannelName, typingUserIds } from "../../store/selectors";
+import { channelLabel, displayName, dmRecipient, isAgeBlocked, isUnread, privateChannelName, typingUserIds } from "../../store/selectors";
 import { settings } from "../../store/settings";
 import { state } from "../../store/state";
 import type { Snowflake } from "../../store/types";
@@ -205,6 +205,12 @@ export function ChannelView(props: { channelId: Snowflake }) {
     onCleanup(unlisten);
   });
 
+  // Âge vérifié entre-temps : on réessaie de charger le salon.
+  const retryAgeGate = () => {
+    setNsfwBlocked(false);
+    void loadMessages(props.channelId);
+  };
+
   const showMembers = () => membersVisible() && (!!ch()?.guild_id || ch()?.type === 3);
   // Le panneau superposé se referme quand on change de salon.
   createEffect(on(() => props.channelId, () => setUi("membersOverlay", false), { defer: true }));
@@ -217,9 +223,20 @@ export function ChannelView(props: { channelId: Snowflake }) {
           <Show when={!ch()?.guild_id}>
             <CallBar channelId={props.channelId} />
           </Show>
-          <MessageList channelId={props.channelId} unreadAfter={unreadAfter()} scrollerRef={(el) => (scroller = el)} />
-          <Composer channelId={props.channelId} onSent={() => scroller && (scroller.scrollTop = 0)} />
-          <TypingIndicator channelId={props.channelId} />
+          <Show
+            when={!isAgeBlocked(props.channelId)}
+            fallback={
+              <div class="empty-view age-gate">
+                <Icon name="lock" size={28} />
+                <p>This channel is age-restricted, and Discord doesn't let this account see it.</p>
+                <button class="link-button" onClick={retryAgeGate}>Try again</button>
+              </div>
+            }
+          >
+            <MessageList channelId={props.channelId} unreadAfter={unreadAfter()} scrollerRef={(el) => (scroller = el)} />
+            <Composer channelId={props.channelId} onSent={() => scroller && (scroller.scrollTop = 0)} />
+            <TypingIndicator channelId={props.channelId} />
+          </Show>
         </div>
         <Show when={ui.search}>
           <SearchPanel channelId={props.channelId} />

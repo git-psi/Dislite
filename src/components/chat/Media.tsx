@@ -202,7 +202,7 @@ function RichEmbed(props: { embed: Embed; guildId?: Snowflake }) {
   const e = () => props.embed;
   const fields = () => e().fields ?? [];
   return (
-    <div class="embed" style={{ "border-left-color": colorOf(e().color) ?? "var(--bg-4)" }}>
+    <div class="embed" style={{ "--bar": colorOf(e().color) ?? "var(--bg-4)" }}>
       <div class="embed-body">
         <Show when={e().provider?.name}>
           <div class="embed-provider small muted">{e().provider!.name}</div>

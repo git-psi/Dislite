@@ -103,7 +103,7 @@ function Node(props: { msg: Message; c: any }): JSX.Element {
         <hr class="app-separator" classList={{ invisible: c().divider === false }} />
       </Match>
       <Match when={c().type === 17}>
-        <div class="app-container" style={{ "border-left-color": c().accent_color ? `#${c().accent_color.toString(16).padStart(6, "0")}` : "var(--bg-4)" }}>
+        <div class="app-container" style={{ "--bar": c().accent_color ? `#${c().accent_color.toString(16).padStart(6, "0")}` : "var(--bg-4)" }}>
           <For each={c().components ?? []}>{(child) => <Node msg={props.msg} c={child} />}</For>
         </div>
       </Match>

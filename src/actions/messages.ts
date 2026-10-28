@@ -21,6 +21,41 @@ import { setUi, toast, ui } from "../store/ui";
 
 const PAGE_SIZE = 50;
 
+// ---------------------------------------------------------------- salons 18+
+
+/** Comptes pour lesquels Discord refuse les salons 18+ (retenu d'un lancement à l'autre :
+ *  sinon le bouton « prochain non-lu » y retomberait à chaque fois). */
+const NSFW_BLOCKED_KEY = "accord:nsfwBlocked";
+
+function nsfwBlockedAccounts(): Snowflake[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(NSFW_BLOCKED_KEY) ?? "[]");
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+/** À READY : `nsfw_allowed` explicitement faux, ou refus déjà constaté pour ce compte. */
+export function initNsfwBlocked(user: { id: Snowflake; nsfw_allowed?: boolean | null }) {
+  setState("nsfwBlocked", user.nsfw_allowed === false || nsfwBlockedAccounts().includes(user.id));
+}
+
+export function setNsfwBlocked(on: boolean) {
+  setState("nsfwBlocked", on);
+  const id = state.meId;
+  if (!id) return;
+  const others = nsfwBlockedAccounts().filter((a) => a !== id);
+  try {
+    localStorage.setItem(NSFW_BLOCKED_KEY, JSON.stringify(on ? [...others, id] : others));
+  } catch {
+    /* stockage plein */
+  }
+}
+
+/** Refus de Discord pour un contenu 18+ (âge non vérifié). */
+const AGE_GATED = 50269;
+
 export async function loadMessages(channelId: Snowflake, older = false) {
   const bucket = state.messages[channelId];
   if (bucket?.loading) return;
@@ -36,8 +71,9 @@ export async function loadMessages(channelId: Snowflake, older = false) {
   } catch (e) {
     // Hors ligne ou refus : on garde les messages en cache sans réessayer en boucle.
     setState("messages", channelId, { loading: false, stale: false });
+    if ((e as any)?.code === AGE_GATED) setNsfwBlocked(true);
     // 403 = pas d'accès à l'historique : pas besoin d'alerter.
-    if ((e as any)?.status !== 403) toast(`Couldn't load: ${errorMessage(e)}`, true);
+    else if ((e as any)?.status !== 403) toast(`Couldn't load: ${errorMessage(e)}`, true);
     setState("messages", channelId, "hasMore", false);
   }
 }
