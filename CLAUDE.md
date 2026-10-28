@@ -37,6 +37,16 @@ Tout compile (tsc, vite, cargo). Restent à tester en vrai avec l'utilisateur : 
 latence), notifications à actions, sons, upload. Pistes : annulation d'écho, push-to-talk global,
 paquet AUR / AppImage, mises à jour.
 
+## Captures du README (mode démo)
+`src/dev/demo.ts` (dev seulement) : `scripts/accord-eval 'return await window.__accord.demo()'` remplace
+l'état par des serveurs / personnes / messages inventés, gateway débranchée, lecture seule, sans
+instantané ni écriture (forums). Recharger la page rend la vraie session. Jamais de vraie
+conversation dans le dépôt : `design/` (maquettes, captures réelles) est ignoré par Git.
+Captures Windows : lancer le dev avec `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333`
+puis `Page.captureScreenshot` (CDP) à 1280×800, ×1.5 ; fichiers dans `docs/screenshots/` (JPEG).
+Ne pas annoncer de chiffres non mesurés (mémoire : ~40 Mo pour le Rust, mais WebView2 ajoute
+plusieurs centaines de Mo sous Windows).
+
 ## Captcha
 `discord/captcha.rs` : sur une réponse avec `captcha_key`, `http.rs::send` ouvre une petite fenêtre
 sur `https://discord.com/robots.txt` (la clé hCaptcha de Discord n'est valable que sur ce domaine),

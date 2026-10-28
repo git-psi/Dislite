@@ -14,6 +14,8 @@ export function defaultAvatar(user: Pick<User, "id" | "discriminator">) {
 export function avatarUrl(user: Pick<User, "id" | "avatar" | "discriminator"> | undefined, size = 80) {
   if (!user) return `${CDN}/embed/avatars/0.png`;
   if (!user.avatar) return defaultAvatar(user);
+  // Mode démo : images intégrées.
+  if (user.avatar.startsWith("data:")) return user.avatar;
   return `${CDN}/avatars/${user.id}/${user.avatar}.webp?size=${size}`;
 }
 
@@ -22,6 +24,7 @@ export function memberAvatarUrl(guildId: string, userId: string, hash: string, s
 }
 
 export function guildIconUrl(guild: Pick<Guild, "id" | "icon">, size = 96) {
+  if (guild.icon?.startsWith("data:")) return guild.icon;
   return guild.icon ? `${CDN}/icons/${guild.id}/${guild.icon}.webp?size=${size}` : null;
 }
 

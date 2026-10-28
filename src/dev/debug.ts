@@ -7,6 +7,7 @@ import { eventCounts } from "../gateway/dispatcher";
 import { devFlags } from "../lib/devFlags";
 import * as selectors from "../store/selectors";
 import { state } from "../store/state";
+import { startDemo } from "./demo";
 import { setUi, ui } from "../store/ui";
 
 // Pas de requestAnimationFrame : il est suspendu quand la fenêtre n'est pas visible.
@@ -28,6 +29,8 @@ const tick = () => new Promise((r) => setTimeout(r, 30));
   },
   /** éléments flottants qui sortent de la fenêtre ou sont rognés par un parent */
   checkOverflow,
+  /** données inventées pour les captures (recharger la page pour revenir à la vraie session) */
+  demo: startDemo,
   /** erreurs JS capturées depuis le lancement */
   errors: [] as string[],
 };

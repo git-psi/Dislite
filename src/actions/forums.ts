@@ -1,5 +1,6 @@
 import { createStore } from "solid-js/store";
 import { backend, errorMessage } from "../ipc/tauri";
+import { devFlags } from "../lib/devFlags";
 import { ingestMessage, putChannel } from "../store/mutations";
 import { setState, state } from "../store/state";
 import { isNewer, makeNonce } from "../lib/snowflake";
@@ -94,6 +95,7 @@ export function visitForum(forumId: Snowflake) {
   // Première visite : ce que l'état de lecture du forum dit déjà lu.
   setBaselines(forumId, visits[forumId] ?? state.readStates[forumId]?.last_message_id ?? null);
   visits[forumId] = makeNonce();
+  if (devFlags.demo) return;
   try {
     localStorage.setItem(VISITS_KEY, JSON.stringify(visits));
   } catch {

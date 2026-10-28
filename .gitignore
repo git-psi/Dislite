@@ -5,3 +5,6 @@ src-tauri/gen/
 dev.log
 # Captures de l'app avec de vraies conversations : jamais dans le dépôt.
 design/captures-d/
+
+# Maquettes et essais de design (travail interne, captures réelles possibles)
+design/

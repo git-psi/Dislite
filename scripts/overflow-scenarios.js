@@ -3,8 +3,8 @@ const A = window.__accord, S = A.state, out = {};
 const wait = (ms) => A.settle(ms);
 document.querySelectorAll(".message-toolbar.open").forEach((t) => t.classList.remove("open"));
 const visibleMsgs = () => [...document.querySelectorAll(".message:not(.system)")].filter(m => { const r = m.getBoundingClientRect(); const sc = document.querySelector(".messages-scroller").getBoundingClientRect(); return r.top >= sc.top && r.bottom <= sc.bottom; });
-const g = Object.values(S.guilds).find(g => g.name === "Walt");
-const gen = S.guildChannels[g.id].map(id => S.channels[id]).find(c => c.name === "general");
+// Un salon de serveur dont les messages sont déjà chargés (au moins une dizaine).
+const gen = Object.values(S.channels).find(c => c.type === 0 && c.guild_id && (S.messages[c.id]?.items.length ?? 0) >= 10);
 A.actions.openChannel(gen.id); await wait(2000);
 for (const [label, pick] of [["haut", m => m[0]], ["bas", m => m[m.length - 1]]]) {
   const m = pick(visibleMsgs()); if (!m) continue;

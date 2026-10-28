@@ -2,6 +2,7 @@
 // gardé en local pour afficher une interface navigable dès le lancement, avant READY.
 // Volontairement réduit : noms, icônes et positions, rien de ce qui change à la seconde.
 
+import { devFlags } from "../lib/devFlags";
 import { batch } from "solid-js";
 import { reconcile } from "solid-js/store";
 import { channelGroups, isUnread, mentionCount, permissionsIn, sortedPrivateChannels } from "./selectors";
@@ -79,7 +80,7 @@ function pickMessage(m: Message): Message {
 }
 
 export function saveSnapshot() {
-  if (!state.ready || !state.meId) return;
+  if (!state.ready || !state.meId || devFlags.demo) return;
   const users = new Map<Snowflake, User>();
   const addUser = (id: Snowflake) => {
     const u = state.users[id];

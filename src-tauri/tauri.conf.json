@@ -36,6 +36,9 @@
     "active": true,
     "targets": ["deb", "appimage"],
     "category": "SocialNetworking",
+    "publisher": "git-psi",
+    "copyright": "© 2026 git-psi, MIT License",
+    "homepage": "https://github.com/git-psi/Dislite",
     "shortDescription": "Client Discord minimaliste",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png"]
   }

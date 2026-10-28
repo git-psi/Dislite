@@ -1,6 +1,7 @@
 // Cycle de vie de la connexion gateway et opcodes envoyés par le client.
 
 import type { UnlistenFn } from "@tauri-apps/api/event";
+import { devFlags } from "../lib/devFlags";
 import { backend, events } from "../ipc/tauri";
 import { settings } from "../store/settings";
 import { setState, state } from "../store/state";
@@ -43,6 +44,7 @@ export async function stopGateway() {
 
 /** Présence : statut, statut personnalisé et activité choisie dans les réglages. */
 export function sendPresence(status: Status, customStatus?: string | null, afk = false) {
+  if (devFlags.demo) return Promise.resolve();
   const activities: unknown[] = customStatus ? [{ type: 4, name: "Custom Status", state: customStatus }] : [];
   const name = settings.activityName.trim();
   if (name) activities.push({ type: settings.activityType, name, created_at: Date.now() });
@@ -54,7 +56,7 @@ export function sendPresence(status: Status, customStatus?: string | null, afk =
  * liste des membres d'un salon, comme le fait le client officiel à l'ouverture.
  */
 export function subscribeGuild(guildId: Snowflake, channelId: Snowflake | null, memberRanges: [number, number][] = [[0, 99]]) {
-  if (state.connection !== "connected") return;
+  if (state.connection !== "connected" || devFlags.demo) return;
   const sub: Record<string, unknown> = { typing: true, activities: true, threads: true };
   if (channelId) sub.channels = { [channelId]: memberRanges };
   return backend.gatewaySend(OP_GUILD_SUBSCRIPTIONS_BULK, { subscriptions: { [guildId]: sub } });
