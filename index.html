@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dislite</title>
+    <!-- Splash statique : affiché dès le premier rendu, avant le chargement du JavaScript. -->
+    <style>
+      html, body, #root { height: 100%; margin: 0; }
+      body { background: var(--bg-3, #292734); color: var(--text-strong, #f7f6f8); font: 15px/1.5 "Inter", "Adwaita Sans", "Noto Sans", system-ui, sans-serif; overflow: hidden; }
+      .boot-splash { height: 100%; display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center; }
+      .boot-splash svg { color: var(--accent, #7c6cf6); animation: breathe 1.6s ease-in-out infinite alternate; }
+      @keyframes breathe { from { opacity: 0.55; } }
+      .boot-splash div { font-size: 22px; font-weight: 800; letter-spacing: 0.02em; }
+      /* Session connue (voir boot.js) : squelette de l'interface au lieu du splash. */
+      .boot-shell { display: none; height: 100%; gap: 8px; padding: 8px 8px 8px 0; box-sizing: border-box; background: var(--bg-0, #111016); }
+      [data-boot="shell"] .boot-shell { display: flex; }
+      [data-boot="shell"] .boot-splash { display: none; }
+      .boot-rail { width: 64px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 4px; }
+      .boot-rail i { width: 40px; height: 40px; border-radius: 10px; background: var(--bg-4, #3d3a4d); opacity: 0.3; }
+      .boot-rail i:first-child { background: var(--accent, #7c6cf6); opacity: 1; }
+      .boot-side { width: 240px; border-radius: 8px; background: var(--bg-2, #201f28); }
+      .boot-main { flex: 1; border-radius: 8px; background: var(--bg-3, #292734); }
+    </style>
+    <script src="/boot.js"></script>
+  </head>
+  <body>
+    <div id="root">
+      <div class="boot-shell"><div class="boot-rail"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="boot-side"></div><div class="boot-main"></div></div>
+      <div class="boot-splash">
+        <svg width="88" height="88" viewBox="0 0 256 256" fill="currentColor" aria-label="Dislite"><g transform="rotate(32 128 128)"><path fill-rule="evenodd" d="M152 12 C204 36 210 92 196 132 L162 150 L190 146 C176 182 154 206 128 224 C104 204 88 176 86 146 L112 156 L87 132 C86 76 108 34 152 12 Z M114 96 a11 13 0 1 0 22 0 a11 13 0 1 0 -22 0 Z M150 92 a11 13 0 1 0 22 0 a11 13 0 1 0 -22 0 Z M127 218 Q132 190 144 168 Q136 192 131 218 Z"/><path d="M128 222 Q126 238 119 250" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></g></svg>
+        <div>Dislite</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

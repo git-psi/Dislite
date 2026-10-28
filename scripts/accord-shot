@@ -1,0 +1,3 @@
+#!/bin/sh
+# Capture du contenu de la page Accord (via le pont de débogage, indépendant de l'écran).
+exec "$(dirname "$0")/accord-eval" "@snapshot ${1:-/tmp/accord.png}"

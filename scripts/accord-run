@@ -1,0 +1,10 @@
+#!/bin/sh
+# Exécute un long script JS (corps de fonction async) en tâche de fond dans Accord et attend son résultat.
+D="$(dirname "$0")"
+BODY=$(grep -v "^[[:space:]]*//" "$1")
+"$D/accord-eval" "window.__run = undefined; (async () => { $BODY })().then(r => window.__run = { ok: r }, e => window.__run = { err: String(e && e.stack || e) }); return 1" >/dev/null || exit 1
+while :; do
+  sleep 3
+  R=$("$D/accord-eval" 'return window.__run ?? null' 2>/dev/null) || continue
+  [ "$R" != "null" ] && { echo "$R"; exit 0; }
+done
