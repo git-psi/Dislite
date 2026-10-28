@@ -103,6 +103,7 @@ export interface VoiceConfig {
   input_gain: number;
   output_volume: number;
   noise_suppression: boolean;
+  echo_cancellation: boolean;
 }
 
 /** Micro ou sortie (identifiant PipeWire et nom lisible). */

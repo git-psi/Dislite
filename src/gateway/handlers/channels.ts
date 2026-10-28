@@ -1,8 +1,10 @@
 // Salons, MP et fils.
 
 import { produce } from "solid-js/store";
-import { putChannel, putUsers, removeChannel } from "../../store/mutations";
+import { ackChannel } from "../../actions/messages";
+import { markReadLocally, putChannel, putUsers, removeChannel, setLastMessage } from "../../store/mutations";
 import { setState, state } from "../../store/state";
+import { isForumLike } from "../../store/types";
 import { currentChannelId, HOME, setUi, ui } from "../../store/ui";
 import { on } from "../dispatcher";
 
@@ -33,6 +35,17 @@ on("THREAD_CREATE", (d) => {
   // New post dans un forum déjà affiché : on l'ajoute en tête.
   const forum = d.parent_id && state.forums[d.parent_id];
   if (forum && !forum.threadIds.includes(d.id)) setState("forums", d.parent_id, "threadIds", (ids) => [d.id, ...ids]);
+  // Le dernier message d'un forum est son dernier post : sans ça, le forum ne passait
+  // en non-lu qu'au prochain lancement.
+  const parent = d.parent_id ? state.channels[d.parent_id] : undefined;
+  if (d.newly_created && parent && isForumLike(parent)) {
+    const previous = parent.last_message_id ?? null;
+    setLastMessage(parent.id, d.id);
+    if (d.owner_id === state.meId) markReadLocally(parent.id, d.id);
+    else if (currentChannelId() === parent.id && ui.windowFocused) ackChannel(parent.id);
+    // Sans état de lecture, le forum serait considéré comme lu.
+    else if (!state.readStates[parent.id]) setState("readStates", parent.id, { last_message_id: previous, mention_count: 0 });
+  }
 });
 
 on("THREAD_UPDATE", (d) => putChannel(d, d.guild_id));

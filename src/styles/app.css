@@ -930,6 +930,10 @@ kbd {
 .post-card { display: flex; gap: 16px; padding: 16px; border-radius: 8px; background: var(--bg-2); border: 1px solid transparent; }
 .post-card:hover { background: var(--bg-hover-solid); border-color: var(--bg-4); }
 .post-card.unread .post-title::after { content: ""; display: inline-block; width: 8px; height: 8px; margin-left: 8px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
+.post-card.unread { border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.post-card.unread .post-title { color: var(--text-strong); }
+.post-badge { display: inline-block; margin-right: 8px; padding: 1px 6px; border-radius: 4px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; vertical-align: 2px; }
+.post-card .post-fresh { color: var(--accent-text); font-weight: 600; }
 .post-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .post-title { margin: 0; font-size: 16px; color: var(--text-strong); }
 .post-snippet { font-size: 14px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

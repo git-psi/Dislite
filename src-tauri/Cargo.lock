@@ -19,6 +19,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aec3"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95b94681e57494d8d3933597fbf49c3537be1f2f33647e41317aab3dfc3d6fc8"
+dependencies = [
+ "crossbeam-channel",
+ "log",
+ "num-complex",
+ "rustfft",
+]
+
+[[package]]
 name = "aes"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1251,6 +1263,7 @@ dependencies = [
 name = "dislite"
 version = "0.1.0"
 dependencies = [
+ "aec3",
  "aes-gcm",
  "base64 0.22.1",
  "bytes",

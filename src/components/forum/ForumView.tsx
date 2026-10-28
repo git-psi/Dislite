@@ -1,12 +1,14 @@
-import { createEffect, createSignal, For, on, Show } from "solid-js";
-import { createForumPost, loadForumThreads } from "../../actions/forums";
+import { createEffect, createSignal, For, on, Show, untrack } from "solid-js";
+import { createForumPost, loadForumThreads, postNews, visitForum } from "../../actions/forums";
+import { ackChannel } from "../../actions/messages";
 import { openChannel } from "../../actions/navigation";
 import { emojiUrl } from "../../lib/cdn";
 import { P } from "../../lib/permissions";
 import { relativeTime } from "../../lib/time";
 import { snowflakeTime } from "../../lib/snowflake";
-import { can, displayName, isUnread } from "../../store/selectors";
+import { can, displayName } from "../../store/selectors";
 import { state } from "../../store/state";
+import { ui } from "../../store/ui";
 import type { Channel, ForumTag, Snowflake } from "../../store/types";
 import { Avatar } from "../common/Avatar";
 import { Icon } from "../common/Icon";
@@ -28,14 +30,18 @@ function PostCard(props: { thread: Channel; forum: Channel }) {
   const tags = () => (props.forum.available_tags ?? []).filter((t) => props.thread.applied_tags?.includes(t.id));
   const lastActivity = () => snowflakeTime(props.thread.last_message_id ?? props.thread.id);
   const image = () => first()?.attachments.find((a) => a.content_type?.startsWith("image/"));
+  const news = () => postNews(props.thread);
 
   return (
-    <button class="post-card" classList={{ unread: isUnread(props.thread.id) }} onClick={() => openChannel(props.thread.id)}>
+    <button class="post-card" classList={{ unread: !!news() }} onClick={() => openChannel(props.thread.id)}>
       <div class="post-main">
         <Show when={tags().length}>
           <div class="post-tags"><For each={tags()}>{(t) => <TagChip tag={t} />}</For></div>
         </Show>
-        <h3 class="post-title">{props.thread.name}</h3>
+        <h3 class="post-title">
+          <Show when={news() === "new"}><span class="post-badge">New</span></Show>
+          {props.thread.name}
+        </h3>
         <Show when={first()}>
           {(m) => (
             <div class="post-snippet">
@@ -50,7 +56,9 @@ function PostCard(props: { thread: Channel; forum: Channel }) {
           </Show>
           <Icon name="thread" size={14} /> {props.thread.message_count ?? 0}
           <span>•</span>
-          <span>{relativeTime(lastActivity())}</span>
+          <span classList={{ "post-fresh": news() === "replies" }}>
+            {news() === "replies" ? `new replies · ${relativeTime(lastActivity())}` : relativeTime(lastActivity())}
+          </span>
           <Show when={props.thread.thread_metadata?.archived}><span>• archived</span></Show>
         </div>
       </div>
@@ -98,17 +106,29 @@ export function ForumView(props: { channelId: Snowflake }) {
   const data = () => state.forums[props.channelId];
   const [composing, setComposing] = createSignal(false);
   const [filter, setFilter] = createSignal<Snowflake | null>(null);
+  const [onlyNew, setOnlyNew] = createSignal(false);
 
   createEffect(on(() => props.channelId, (id) => {
     setComposing(false);
     setFilter(null);
+    setOnlyNew(false);
     if (!state.forums[id]) void loadForumThreads(id);
   }));
+  // Ouvrir le forum le marque comme lu (comme l'officiel) : il quitte les non-lus, et les
+  // posts nouveaux restent signalés un par un. Le repère de visite est pris avant.
+  createEffect(() => {
+    const id = props.channelId;
+    untrack(() => visitForum(id));
+    if (ui.windowFocused && forum()?.last_message_id) ackChannel(id);
+  });
 
-  const threads = () =>
-    (data()?.threadIds ?? [])
-      .map((id) => state.channels[id])
-      .filter((t): t is Channel => !!t && (!filter() || !!t.applied_tags?.includes(filter()!)));
+  const posts = () => (data()?.threadIds ?? []).map((id) => state.channels[id]).filter((t): t is Channel => !!t);
+  const newCount = () => posts().filter((t) => postNews(t)).length;
+  // Les posts avec du nouveau d'abord (dans leur ordre), puis les autres.
+  const threads = () => {
+    const shown = posts().filter((t) => (!filter() || !!t.applied_tags?.includes(filter()!)) && (!onlyNew() || !!postNews(t)));
+    return [...shown.filter((t) => postNews(t)), ...shown.filter((t) => !postNews(t))];
+  };
 
   const onScroll = (e: Event) => {
     const el = e.currentTarget as HTMLElement;
@@ -127,13 +147,17 @@ export function ForumView(props: { channelId: Snowflake }) {
       </header>
       <div class="forum-scroll" onScroll={onScroll}>
         <div class="forum-toolbar">
-          <Show when={forum()?.available_tags?.length}>
-            <div class="post-tags">
-              <For each={forum()!.available_tags}>
-                {(t) => <TagChip tag={t} selected={filter() === t.id} onClick={() => setFilter(filter() === t.id ? null : t.id)} />}
-              </For>
-            </div>
-          </Show>
+          <div class="post-tags">
+            {/* Posts nouveaux ou avec des réponses non lues depuis la dernière visite. */}
+            <Show when={newCount() || onlyNew()}>
+              <button class="tag-chip" classList={{ selected: onlyNew() }} onClick={() => setOnlyNew(!onlyNew())}>
+                New · {newCount()}
+              </button>
+            </Show>
+            <For each={forum()?.available_tags ?? []}>
+              {(t) => <TagChip tag={t} selected={filter() === t.id} onClick={() => setFilter(filter() === t.id ? null : t.id)} />}
+            </For>
+          </div>
           <Show when={can(props.channelId, P.SEND_MESSAGES) && !composing()}>
             <button class="btn primary" onClick={() => setComposing(true)}>
               <Icon name="plus" size={16} /> New post
@@ -150,7 +174,7 @@ export function ForumView(props: { channelId: Snowflake }) {
           <div class="history-loader"><div class="spinner" /></div>
         </Show>
         <Show when={!data()?.loading && !threads().length}>
-          <p class="empty muted">No posts yet.</p>
+          <p class="empty muted">{onlyNew() ? "Nothing new." : "No posts yet."}</p>
         </Show>
       </div>
     </div>

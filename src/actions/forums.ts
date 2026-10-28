@@ -1,7 +1,9 @@
+import { createStore } from "solid-js/store";
 import { backend, errorMessage } from "../ipc/tauri";
 import { ingestMessage, putChannel } from "../store/mutations";
 import { setState, state } from "../store/state";
-import type { Message, Snowflake } from "../store/types";
+import { isNewer, makeNonce } from "../lib/snowflake";
+import type { Channel, Message, Snowflake } from "../store/types";
 import { toast } from "../store/ui";
 import { openChannel } from "./navigation";
 
@@ -67,4 +69,47 @@ export async function createForumPost(forumId: Snowflake, title: string, content
     toast(`Couldn't publish: ${errorMessage(e)}`, true);
     return false;
   }
+}
+
+// ---------------------------------------------------------------- nouveautés
+
+/** Dernière visite de chaque forum (snowflake de la date), d'un lancement à l'autre. */
+const VISITS_KEY = "accord:forumVisits";
+/** Repère de la session : fixé à la première ouverture, pour que les badges restent
+ *  jusqu'à ce que chaque post soit lu (et non jusqu'au prochain passage sur le forum). */
+const [baselines, setBaselines] = createStore<Record<Snowflake, Snowflake | null>>({});
+
+function loadVisits(): Record<Snowflake, Snowflake> {
+  try {
+    return JSON.parse(localStorage.getItem(VISITS_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+/** À l'ouverture d'un forum, avant de le marquer comme lu. */
+export function visitForum(forumId: Snowflake) {
+  if (forumId in baselines) return;
+  const visits = loadVisits();
+  // Première visite : ce que l'état de lecture du forum dit déjà lu.
+  setBaselines(forumId, visits[forumId] ?? state.readStates[forumId]?.last_message_id ?? null);
+  visits[forumId] = makeNonce();
+  try {
+    localStorage.setItem(VISITS_KEY, JSON.stringify(visits));
+  } catch {
+    /* stockage plein : les badges seront seulement moins précis */
+  }
+}
+
+export type PostNews = "new" | "replies" | null;
+
+/** Post créé depuis la dernière visite et jamais ouvert, ou post avec des réponses non lues. */
+export function postNews(thread: Channel): PostNews {
+  const rs = state.readStates[thread.id];
+  const last = thread.last_message_id ?? thread.id;
+  const base = baselines[thread.parent_id ?? ""] ?? null;
+  if (rs) return isNewer(last, rs.last_message_id) ? "replies" : null;
+  if (!base) return null;
+  if (isNewer(thread.id, base)) return "new";
+  return isNewer(last, base) ? "replies" : null;
 }

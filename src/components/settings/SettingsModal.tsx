@@ -195,6 +195,9 @@ function VoiceSection() {
       <Row title="Noise suppression" hint="Removes keyboard, fan and background noise from your voice (RNNoise, on this computer).">
         <Toggle value={settings.voiceNoiseSuppression} onChange={(v) => setSettings("voiceNoiseSuppression", v)} />
       </Row>
+      <Row title="Echo cancellation" hint="Keeps the others from hearing themselves when you use speakers instead of headphones.">
+        <Toggle value={settings.voiceEchoCancellation} onChange={(v) => setSettings("voiceEchoCancellation", v)} />
+      </Row>
       <Row title="Input mode" hint={settings.voicePtt ? "Hold the key while Dislite is focused. Global shortcuts depend on your compositor." : "Your voice is sent when it's louder than the threshold below."}>
         <div class="ptt-control">
           <Segmented<string>

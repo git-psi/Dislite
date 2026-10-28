@@ -176,6 +176,7 @@ export const voiceConfig = () => ({
   input_gain: settings.voiceInputGain,
   output_volume: settings.voiceOutputVolume,
   noise_suppression: settings.voiceNoiseSuppression,
+  echo_cancellation: settings.voiceEchoCancellation,
 });
 
 // ---------------------------------------------------------------- volumes

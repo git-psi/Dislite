@@ -2,6 +2,7 @@
 
 mod audio;
 mod conn;
+mod echo;
 mod rtp;
 
 use std::collections::HashMap;
@@ -36,6 +37,13 @@ pub struct VoiceConfig {
     /// suppression de bruit (RNNoise)
     #[serde(default)]
     pub noise_suppression: bool,
+    /// annulation d'écho (le son des haut-parleurs retiré du micro)
+    #[serde(default = "yes")]
+    pub echo_cancellation: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 fn one() -> f32 {
@@ -126,6 +134,7 @@ impl Voice {
             output: config.output,
             mixer: conn.shared.mixer.clone(),
             capture: conn.capture.clone(),
+            echo_cancellation: config.echo_cancellation,
         })
     }
 }
@@ -207,7 +216,10 @@ pub fn voice_set_config(state: State<'_, AppState>, config: VoiceConfig) -> Resu
     let voice = &state.voice;
     let devices_changed = {
         let mut current = voice.config.lock().unwrap();
-        let changed = current.input != config.input || current.output != config.output;
+        // L'annulation d'écho se branche à l'ouverture du micro : la changer le rouvre aussi.
+        let changed = current.input != config.input
+            || current.output != config.output
+            || current.echo_cancellation != config.echo_cancellation;
         *current = config.clone();
         changed
     };
@@ -261,6 +273,7 @@ pub fn voice_mic_test(app: AppHandle, state: State<'_, AppState>, on: bool) -> R
         output: config.output,
         mixer: Arc::new(Mutex::new(audio::Mixer::default())),
         capture: tx,
+        echo_cancellation: config.echo_cancellation,
     })
     .map_err(|e| Error::other(format!("audio: {e}")))?;
     let (stop_tx, mut stop_rx) = watch::channel(false);

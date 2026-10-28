@@ -48,6 +48,7 @@ export interface Settings {
   voiceInputGain: number;
   voiceOutputVolume: number;
   voiceNoiseSuppression: boolean;
+  voiceEchoCancellation: boolean;
   /** l'accent par défaut a déjà été converti (on respecte ensuite un choix explicite) */
   accentMigrated?: boolean;
 }
@@ -80,6 +81,7 @@ const defaults: Settings = {
   voiceInputGain: 1,
   voiceOutputVolume: 1,
   voiceNoiseSuppression: true,
+  voiceEchoCancellation: true,
 };
 
 function load(): Settings {

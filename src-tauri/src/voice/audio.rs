@@ -34,6 +34,9 @@ struct Source {
 pub struct Mixer {
     sources: HashMap<u32, Source>,
     pub deaf: bool,
+    /// ce qui est joué (mono 48 kHz), référence de l'annulation d'écho quand elle tourne
+    pub record_reference: bool,
+    pub reference: VecDeque<f32>,
 }
 
 impl Mixer {
@@ -78,7 +81,15 @@ impl Mixer {
                 _ => src.playing = false,
             }
         }
-        (l.clamp(-1.0, 1.0), r.clamp(-1.0, 1.0))
+        let (l, r) = (l.clamp(-1.0, 1.0), r.clamp(-1.0, 1.0));
+        if self.record_reference {
+            // Au plus 1 s d'avance si l'annulation d'écho prend du retard.
+            if self.reference.len() >= RATE as usize {
+                self.reference.pop_front();
+            }
+            self.reference.push_back((l + r) * 0.5);
+        }
+        (l, r)
     }
 }
 
@@ -216,6 +227,7 @@ pub struct AudioSetup {
     pub mixer: Arc<Mutex<Mixer>>,
     /// audio du micro, mono 48 kHz
     pub capture: UnboundedSender<Vec<f32>>,
+    pub echo_cancellation: bool,
 }
 
 /// Ouvre le micro et la sortie dans un thread dédié.
@@ -243,19 +255,22 @@ pub fn start(setup: AudioSetup) -> Result<AudioIo, String> {
     Ok(AudioIo { stop: stop_tx })
 }
 
-fn open_streams(setup: AudioSetup) -> Result<(Option<cpal::Stream>, cpal::Stream), String> {
+fn open_streams(mut setup: AudioSetup) -> Result<(Option<cpal::Stream>, cpal::Stream), String> {
     let host = cpal::default_host();
     // ~10 ms par période : la voix part et arrive sans attendre de gros tampons.
     #[cfg(target_os = "linux")]
     std::env::set_var("PIPEWIRE_LATENCY", "480/48000");
     let outputs = host.output_devices().map(|d| d.collect()).unwrap_or_default();
     let output = pick(outputs, setup.output.as_deref(), host.default_output_device()).ok_or("no audio output found")?;
-    let out_stream = build_output(&output, setup.mixer)?;
+    let out_stream = build_output(&output, setup.mixer.clone())?;
     out_stream.play().map_err(|e| e.to_string())?;
 
     // Sans micro, on peut quand même écouter.
     let inputs = host.input_devices().map(|d| d.collect()).unwrap_or_default();
     let input = pick(inputs, setup.input.as_deref(), host.default_input_device());
+    if input.is_some() && setup.echo_cancellation {
+        setup.capture = super::echo::spawn(setup.capture, setup.mixer);
+    }
     let in_stream = match input {
         Some(dev) => match build_input(&dev, setup.capture) {
             Ok(s) => {

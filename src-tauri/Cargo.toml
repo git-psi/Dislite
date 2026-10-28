@@ -49,6 +49,7 @@ nnnoiseless = { version = "0.5", default-features = false }
 env_logger = "0.11"
 # Fuseau horaire IANA (Linux : /etc/localtime ; Windows : API du système).
 iana-time-zone = "0.1"
+aec3 = "0.4"
 
 [target.'cfg(not(windows))'.dependencies]
 # Notifications système avec boutons (freedesktop)
