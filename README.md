@@ -3,8 +3,6 @@
 &nbsp;&nbsp;Dislite
 </h1>
 
-[Version française](README_FR.md)
-
 **A light, calm Discord client for Linux and Windows: native voice, fast start, nothing that pulls you in.**
 
 Dislite talks to Discord directly, without the official app. It opens in a second from a local
@@ -71,9 +69,9 @@ and run it. No administrator rights needed. Dislite then updates itself.
 ### Linux
 
 From the [latest release](https://github.com/git-psi/Dislite/releases/latest):
-
-- **AppImage**: make it executable and run it. It updates itself.
-- **.deb** (Debian, Ubuntu): `sudo apt install ./Dislite_x.y.z_amd64.deb`.
+ - **AppImage**: make it executable and run it. It updates itself.
+ - **.deb** (Debian, Ubuntu): `sudo apt install ./Dislite_x.y.z_amd64.deb`.
+ - **Arch, CachyOS, Manjaro**: `sudo pacman -U ./dislite-x.y.z-1-x86_64.pkg.tar.zst`. Updated through pacman: download the new package for each version (no self-update).
 
 Notifications with buttons, the tray icon and video playback use your desktop's usual libraries
 (`libayatana-appindicator`, GStreamer). Without GStreamer, videos open in mpv or your browser.
